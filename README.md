@@ -1,8 +1,13 @@
 # **Machine Learning Predict DIFOT Project using Python**
-*This project using Python 3 to Data Proceesing and run Machine Learning a data set about sales order of top-leading Beverage industry company in VietNam*
+*This project using Python to Data Proceesing and run Machine Learning to predict DIFOT. A data set include: sales order, sale register,GPS_customer and GPS_distributor of top-leading FMCG industry company in VietNam.*
 
 <img width="700" alt="image" src="https://github.com/user-attachments/assets/05591b19-ca09-4a0c-a7af-b91f32c14947">
 
+# **Definition of DIFOT**
+DIFOT stands for Delivery In Full, On Time. It is a key performance indicator (KPI) used in supply chain management to measure the percentage of deliveries that are both:
+-In Full: The complete order was delivered without any shortages.
+-On Time: The order was delivered on or before the agreed delivery date.
+DIFOT is used to assess the reliability and efficiency of a company's delivery processes. It tracks how often customers receive their complete orders on the promised delivery date. A high DIFOT score indicates a high level of service reliability, while a low DIFOT score signals potential issues in the supply chain.
 
 # **Python package using in project**
 - Pandas/Numpy
