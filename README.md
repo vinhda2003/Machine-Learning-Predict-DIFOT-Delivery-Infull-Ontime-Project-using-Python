@@ -1,14 +1,14 @@
-# **Layoff Analyst Project using MySQL**
-*This project using MySQL to Data Proceesing and Exploratory Data Analysis a data set about number of laid off employees of major corporations in the world*
+# **Machine Learning Predict DIFOT Project using Python**
+*This project using Python 3 to Data Proceesing and run Machine Learning a data set about sales order of top-leading Beverage industry company in VietNam*
 
-<img width="700" alt="heading img layoff" src="https://github.com/user-attachments/assets/d602328c-61ab-4464-a3f3-523b35c8be61">
+<img width="700" alt="image" src="https://github.com/user-attachments/assets/05591b19-ca09-4a0c-a7af-b91f32c14947">
 
 
-# **SQL statements using in project**
-- Basic statements
-- Create/Alter/Update/Delete table
-- Join/Window functions
-- Subqueries/CTEs/Temp table
+# **Python package using in project**
+- Pandas/Numpy
+- Pyspark/pyspark.sql
+- Matplot/Seaborn
+- Sklearn/xgboost/imbalanced-learn
 
 # **Phase 1: Data Proceesing**
 ## **Remove duplicate**
