@@ -5,8 +5,8 @@
 
 # **Definition of DIFOT**
 DIFOT stands for Delivery In Full, On Time. It is a key performance indicator (KPI) used in supply chain management to measure the percentage of deliveries that are both:
--In Full: The complete order was delivered without any shortages.
--On Time: The order was delivered on or before the agreed delivery date.
+- In Full: The complete order was delivered without any shortages.
+- On Time: The order was delivered on or before the agreed delivery date.
 DIFOT is used to assess the reliability and efficiency of a company's delivery processes. It tracks how often customers receive their complete orders on the promised delivery date. A high DIFOT score indicates a high level of service reliability, while a low DIFOT score signals potential issues in the supply chain.
 
 # **Python package using in project**
