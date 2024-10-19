@@ -169,9 +169,152 @@ final_df_with_distance = final_df.withColumn(
 print(final_df_with_distance.columns)
 
 ```
+#### **Fill missing value**
+```
+#Fill Missing Value equal median
+
+
+median_distance_km = 5.881606785112515
+
+from pyspark.sql.functions import when
+
+condition = (
+    (col('GPScuslatitude') == 0) |
+    (col('GPScuslongitude') == 0) |
+    (col('GPSdistlatitude') == 0) |
+    (col('GPSdistlongitude') == 0) |
+    col('distance_km').isNull() |
+    (col('distance_km') == 'N/A')
+)
+
+
+# Apply the condition to fill the distance_km column
+final_df_with_distance=final_df_with_distance.cache()
+final_df_filled = final_df_with_distance.withColumn(
+    'distance_km',
+    when(condition, median_distance_km).otherwise(col('distance_km'))
+)
+
+final_df_filled = final_df_filled.withColumn('order_date', to_date(col('order_date'), 'MM-dd-yyyy')) # Định dạng mẫu ví dụ
+final_df_filled = final_df_filled.withColumn('settlement_date', to_date(col('settlement_date'), 'MM-dd-yyyy')) # Định dạng mẫu ví dụ
+
+# Verify the results
+final_df_filled.show(1)
+```
+#### **Filter Outlier**
+```
+#Remove outliers using IQR method
+
+from pyspark.sql.functions import col
+from pyspark.sql import SparkSession
+
+# Spark session
+spark = SparkSession.builder.appName("OutlierDetection").getOrCreate()
+
+# Calculate (Q1 và Q3) and IQR
+# Using approxQuantile
+quantiles = final_df_filled.approxQuantile("distance_km", [0.25, 0.75], 0.01)
+
+Q1 = quantiles[0]
+Q3 = quantiles[1]
+IQR = Q3 - Q1
+
+# Calculate bound outlier
+lower_bound = Q1 - 2 * IQR
+upper_bound = Q3 + 2 * IQR
+
+# Remove outliers
+filtered_outliers_df = final_df_filled.filter(
+    (col('distance_km') >= lower_bound) & (col('distance_km') <= upper_bound)
+)
+
+# Checking remaining data
+total_rows = final_df_filled.count()
+filtered_rows = filtered_outliers_df.count()
+remaining_data_percentage = (filtered_rows / total_rows) * 100
+
+print(f"IQR: {IQR}")
+print(f"Lower Bound: {lower_bound}")
+print(f"Upper Bound: {upper_bound}")
+print(f"Remaining Data Percentage: {remaining_data_percentage:.2f}%")
+```
+<img width="575" alt="image" src="https://github.com/user-attachments/assets/f10ae9c1-9d6e-4b49-83ae-51eafcda914f">
+
 #### **Delivery Day**
+```
+from pyspark.sql.functions import col, datediff
 
+filtered_outliers_df = filtered_outliers_df.withColumn(
+    "DeliveryDay", datediff(col("settlement_date"), col("order_date"))
+)
 
+filtered_outliers_df = filtered_outliers_df.withColumn(
+  "DeliveryDay", col("DeliveryDay").cast("double")
+)
+
+filtered_outliers_df.printSchema()
+
+from pyspark.sql.functions import col, countDistinct, concat, lit, when, coalesce
+from pyspark.sql import functions as F
+
+# Step 1: Perform a left join between the two DataFrames based on the date range condition
+joined_df = filtered_outliers_df.join(
+    Listdayoff,
+    (col("d_date") >= col("order_date")) & (col("d_date") <= col("settlement_date")),
+    "left"
+)
+
+# Step 2: Create a new key by concatenating "order_date", "order_no", "settlement_date", and "customer_code" and group by this key
+days_off_count_df = joined_df.withColumn(
+    "order_key", concat(col("order_date").cast("string"), lit('-'), col("order_no"), lit('-'), col("settlement_date"), lit('-'), col("customer_code"))
+).groupBy("order_key").agg(
+    countDistinct("d_date").alias("days_off_count")
+)
+
+filtered_outliers_df.printSchema()
+days_off_count_df.printSchema()
+
+# Step 3: Join this result back to the original DataFrame using the new key and calculate Dayprocessing
+filtered_outliers_df = filtered_outliers_df.withColumn(
+    "order_key", concat(col("order_date").cast("string"), lit('-'), col("order_no"), lit('-'), col("settlement_date"), lit('-'), col("customer_code"))
+).join(
+    days_off_count_df, "order_key", "left"
+).withColumn(
+    "days_off_count", coalesce(days_off_count_df["days_off_count"], lit(0))
+).withColumn(
+    "Dayprocessing", when(col("DeliveryDay") - col("days_off_count") < 0, lit(0))
+                    .otherwise(col("DeliveryDay") - col("days_off_count"))
+)
+
+# Create 'Ontime'column
+filtered_outliers_df = filtered_outliers_df.withColumn(
+    "Ontime", when(col("Dayprocessing") <= 2, "Yes").otherwise("No")
+)
+
+# Show the resulting DataFrame with the new column
+filtered_outliers_df.show(1)
+
+# Print the schema of the resulting DataFrame
+filtered_outliers_df.printSchema()
+
+```
+<img width="500" alt="image" src="https://github.com/user-attachments/assets/5bfa3ab6-831d-4718-95bc-8fbaa20bbdbc">
+
+#### **Infull and DIFOT**
+```
+filtered_outliers_df.cache()
+filtered_outliers_df = filtered_outliers_df.withColumn(
+    "Infull", when(col("diff_ec") <= 0.1, "Yes").otherwise("No")
+)
+filtered_outliers_df = filtered_outliers_df.withColumn(
+    "DIFOT", when((col("Infull") == "Yes") & (col("Ontime") == "Yes"), "Yes").otherwise("No")
+)
+
+filtered_outliers_df.printSchema()
+```
+<img width="277" alt="image" src="https://github.com/user-attachments/assets/f1dd94ea-c748-4945-aedb-9676cc7ed0c5">
+
+## **Phase 2: EDA & Feature Engineering**
 
 
 
