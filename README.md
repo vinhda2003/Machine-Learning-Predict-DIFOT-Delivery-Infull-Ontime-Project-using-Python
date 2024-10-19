@@ -16,50 +16,52 @@ DIFOT is used to assess the reliability and efficiency of a company's delivery p
 - Matplot/Seaborn
 - Sklearn/xgboost/imbalanced-learn
 
-# **Phase 1: Data Proceesing**
-## **Remove duplicate**
-```sql
--- Check duplicates (row_num > 1)
-WITH dup_cte AS
-(
-SELECT *,
-ROW_NUMBER() OVER(
-PARTITION BY company,location,industry,total_laid_off,percentage_laid_off,'date',stage,funds_raised_millions) as row_num
-FROM layoffs_cleaned
-)
-SELECT *
-FROM dup_cte
-WHERE row_num > 1;
+# **Key takeaways**
+- How to conduct full stages of machine learning project
+- XGBoost Classifier is the best fit modeling for predict DIFOT
+- Top 5 importance feature impact to DIFOT: distance_km,%urbanization rate,totalec_so,isfreegood_order_no,segmentation_Gold
+- Actionable recomendations for 5 features above
 
---Create a new table before delete duplicate
-CREATE TABLE `layoffs_cleaned_ver2` (
-  `company` text,
-  `location` text,
-  `industry` text,
-  `total_laid_off` int DEFAULT NULL,
-  `percentage_laid_off` text,
-  `date` text,
-  `stage` text,
-  `country` text,
-  `funds_raised_millions` int DEFAULT NULL,
-  `row_num` int DEFAULT NULL
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+# **Data Analysis Process**
+<img width="700" alt="image" src="https://github.com/user-attachments/assets/494efa12-ba31-4e71-b370-b4a63740a1f3">
+*Phases of project*
+- Phase 1: Data Colection and Preprocessing
+- Phase 2: EDA & Feature Engineering
+- Phase 3: Model tranining & testing
 
---Add value into table was deleted duplicate (row_num = 1)
-INSERT layoffs_cleaned_ver2
-WITH dup_cte AS
-(
-SELECT *,
-ROW_NUMBER() OVER(
-PARTITION BY company,location,industry,total_laid_off,percentage_laid_off,'date',stage,funds_raised_millions) as row_num
-FROM layoffs_cleaned
-)
-SELECT *
-FROM dup_cte
-WHERE row_num = 1;
+## **Phase 1: Data Colection and Preprocessing**
+*Data colecting process*
+<img width="700" alt="image" src="https://github.com/user-attachments/assets/6dace349-6bd2-4b24-ae40-3b3806d85f8d">
 
 ```
-<img width="700" alt="duplicate_table" src="https://github.com/user-attachments/assets/b9139eed-f603-4632-99cb-c6c8c35b9bd9">
+#Import table factdata show transaction of sales register & sales order  
+
+from pyspark.sql import SparkSession
+from pyspark.sql.types import DoubleType
+from pyspark.sql.functions import col,to_date
+
+factdata= spark.read.csv('/kaggle/working/DIFOT Result Full from May23 to Aug24 - Copy.csv')
+header = factdata.first()
+# Remove the first row from the DataFrame
+factdata = factdata.filter(col("`_c0`") != header._c0) # Assuming _c0 is not null in the header
+# Create a list of column names from the header row
+columns = [header[i] for i in range(len(header))]
+# Rename columns in the DataFrame
+factdata = factdata.select([col(f"`_c{i}`").alias(name) for i, name in enumerate(columns)])
+
+factdata = factdata.withColumn('order_date', to_date(col('order_date'), 'dd-MM-yyyy')) # Định dạng mẫu ví dụ
+factdata = factdata.withColumn('settlement_date', to_date(col('settlement_date'), 'dd-MM-yyyy')) # Định dạng mẫu ví dụ
+factdata= factdata.withColumn('totalec_sr', col('totalec_sr').cast(DoubleType()))
+factdata= factdata.withColumn('totalNSR_sr', col('totalNSR_sr').cast(DoubleType()))
+factdata= factdata.withColumn('totalNSR_so', col('totalNSR_so').cast(DoubleType()))
+factdata= factdata.withColumn('totalec_so', col('totalec_so').cast(DoubleType()))
+factdata= factdata.withColumn('diff_ec', col('diff_ec').cast(DoubleType()))
+factdata= factdata.withColumn('diff_NSR', col('diff_NSR').cast(DoubleType()))
+factdata.show(1)
+factdata.printSchema()
+```
+<img width="700" alt="image" src="https://github.com/user-attachments/assets/9a8df9f9-3fcf-40c5-8396-f9fa9d82abdb">
+
 
 ## **Standardize Data**
 
