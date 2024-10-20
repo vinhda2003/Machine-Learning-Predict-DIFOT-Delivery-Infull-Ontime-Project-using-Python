@@ -931,6 +931,24 @@ evaluate_model(dt_model, X_train, Y_train, X_test, Y_test)
 ```
 <img width="547" alt="image" src="https://github.com/user-attachments/assets/cad1b857-1a63-4a02-92ca-d292a332e3f0">
 
-# **Reference**
-[Alex The Analyst](https://www.youtube.com/watch?v=4UltKCnnnTA&list=PLUaB-1hjhk8FE_XZ87vPPSfHqb6OcM0cF&index=19)
+# **Actionable recomendations for 5 features above**
+
+- Delivery Distance (distance_km)
+Delivery distance significantly impacts on-time performance. To improve DIFOT, the company should optimize routes using GPS, analyze common routes, and select appropriate vehicles. Establishing distribution centers closer to customers and partnering with local delivery services can also reduce distance and improve delivery speed.
+
+- Urbanization Rate (%urbanization rate)
+Urbanization affects delivery efficiency. To enhance DIFOT, the company should study urbanization levels in different areas and adjust delivery strategies accordingly. This may include offering express delivery services or setting up delivery points in densely populated areas to reduce delivery times.
+
+- Total Order Quantity (totalec_so)
+Order quantity impacts transport efficiency. To boost DIFOT, the company can encourage bulk orders through promotions, offering discounts or free shipping for larger orders. This reduces transportation costs and optimizes delivery operations, enhancing overall efficiency.
+
+- Promotional Goods Availability (isfreegood_order_no)
+Promotional items attract customers and drive sales. To improve DIFOT, the company should ensure promotional stock availability through tight inventory management. Clear communication about promotions can increase customer loyalty and satisfaction, enhancing DIFOT performance.
+
+- Gold Customer Segment (segmentation_Gold)
+Gold customers are high-value clients requiring premium service. To improve DIFOT for this segment, the company should offer priority delivery, quality checks before shipping, and dedicated customer service. This increases satisfaction and loyalty, contributing to a higher DIFOT.
+
+
+# **Thanks For Reading**
+
 
