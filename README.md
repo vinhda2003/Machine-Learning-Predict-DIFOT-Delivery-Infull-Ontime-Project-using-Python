@@ -538,6 +538,398 @@ plt.show()
 ```
 ![output](https://github.com/user-attachments/assets/218b3d0a-261c-46fc-8098-ae29360a1980)
 
+```
+import seaborn as sns
+import matplotlib.pyplot as plt
+
+# Group by region and % urbanization rate, and calculate the mean of DIFOT
+
+summary_df = filtered_outliers_df.groupBy('% urbanization rate') \
+    .agg(
+        F.countDistinct(F.when(F.col('DIFOT') == 0, F.col('order_no'))).alias('order_non_difot'),
+        F.countDistinct(F.when(F.col('DIFOT') == 1, F.col('order_no'))).alias('order_difot')
+    )
+
+summary_df = summary_df.withColumn(
+    '%DIFOT',
+    (F.col('order_difot') / (F.col('order_non_difot') + F.col('order_difot')) * 100)
+)
+summary_df =summary_df.toPandas()
+
+# Create the scatter plot
+sns.scatterplot(data=summary_df , x='% urbanization rate', y='%DIFOT')
+
+# Add plot labels and title
+plt.xlabel('% Urbanization Rate')
+plt.ylabel('DIFOT(%)')
+plt.title('DIFOT vs Urbanization Rate')
+#rangey_chart=list(range(0,100,5))
+# plt.ylim(50,100,5)
+plt.xlim(0,100,5)
+
+# Show the plot
+plt.show()
+```
+![output1](https://github.com/user-attachments/assets/1fbc51c1-f5bc-4cb9-b8aa-0ec0d04c83a0)
+
+```
+from pyspark.sql import functions as F
+import numpy as np
+
+
+# Create table have number of order_difot and order_non_difot
+summary_df = filtered_outliers_df.groupBy('region', 'item_code') \
+    .agg(
+        F.countDistinct(F.when(F.col('DIFOT') == 0, F.col('order_no'))).alias('order_non_difot'),
+        F.countDistinct(F.when(F.col('DIFOT') == 1, F.col('order_no'))).alias('order_difot')
+    )
+
+# Calculate % DIFOT
+summary_df = summary_df.withColumn(
+    '%DIFOT',
+    (F.col('order_difot') / (F.col('order_non_difot') + F.col('order_difot')) * 100)
+)
+summary_df=summary_df.toPandas()
+# create pivot table %DIFOT
+pivot_heat = pd.pivot_table(
+    summary_df,
+    index='item_code',        
+    columns='region',         
+    values='%DIFOT'           
+)
+# Create col VN equal sum of all Regions
+pivot_heat['VN'] = pivot_heat.sum(axis=1)
+
+# Sort ASC by col VN & Show top 20
+pivot_heat_top20 = pivot_heat.sort_values(by='VN', ascending=False).head(20)
+pivot_heat_top20 = pivot_heat_top20.drop(columns=['VN'])
+region_mapping = {
+    'Central  Region': 'CP',
+    'Hanoi Region': 'HN',
+    'Ho Chi Minh Region': 'HC',
+    'Mekong Delta Region': 'MK',
+    'North East Region': 'NE',
+    'North West Region': 'NW',
+    'South Provinces Reg': 'SP'
+}
+
+pivot_heat_top20.rename(columns=region_mapping, inplace=True)
+
+
+annot_data = pivot_heat_top20.applymap(lambda x: '{:.1f}%'.format(x))
+
+# Create heatmap using annot format %
+sns.heatmap(data=pivot_heat_top20,
+            annot=annot_data,  #
+            fmt="",  
+            cmap="Blues", 
+            linecolor='white', linewidths=0.5)
+
+
+ax.set_yticklabels(yticks, rotation=0);
+ax.set_xticklabels(xticks, rotation=90);
+title1='TOP 20 ITEM CODE WITH HIGHEST % DIFOT'
+ax.set_title(title1,loc='center',fontsize=18)
+
+sns.heatmap
+```
+![output2](https://github.com/user-attachments/assets/b8863ddb-d337-4ea3-b8d0-3c6448facd8b)
+
+### **Feature engineering**
+#### **Correlation matrix**
+
+```
+spark.conf.set("spark.sql.execution.arrow.enabled", "false")
+# filtered_outliers_df.printSchema()
+corre_df = filtered_outliers_df.sample(fraction=0.1,seed=1505).select(
+    'totalNSR_so', 'totalec_so', 'distance_km', 'DeliveryDay', 'days_off_count', 
+    'Dayprocessing', 'Ontime', 'Infull', 'DIFOT', '% urbanization rate','isfreegood_order_no'
+)
+corre_df=corre_df.toPandas()
+corre_matrix=corre_df.corr()
+corre_matrix
+
+import numpy as np
+ones_corr=np.ones_like(corre_matrix,dtype=bool)
+ones_corr.shape , corre_matrix.shape 
+mask=np.triu(ones_corr)
+adjustedmask=mask[1:, :-1]
+adjusted_corre_matrix=corre_matrix.iloc[1:, :-1]
+
+fig, ax=plt.subplots(figsize=(10,8))
+sns.heatmap(data=adjusted_corre_matrix,mask=adjustedmask,
+            annot=True,fmt=".2f",cmap="Blues",vmin=-1,vmax=1,
+           linecolor='white', linewidths=0.5)
+
+yticks=[i.upper() for i in adjusted_corre_matrix.index]
+
+xticks=[i.upper() for i in adjusted_corre_matrix.columns]
+
+ax.set_yticklabels(yticks, rotation=0);
+ax.set_xticklabels(xticks, rotation=90);
+title='CORRELATION MAXTRIX OF DIFOT VARIABLE'
+ax.set_title(title,loc='center',fontsize=18)
+```
+<img width="600" alt="image" src="https://github.com/user-attachments/assets/1579a6ae-e37d-4cec-b9d6-f93cc22c0820">
+
+#### **Feature importance**
+
+```
+from sklearn.ensemble import ExtraTreesClassifier
+import pandas as pd
+import matplotlib.pyplot as plt
+
+# numerical variables
+numeric_var = ['totalec_so', 'distance_km', 'DeliveryDay', 'days_off_count', 'Dayprocessing', '% urbanization rate', 'isfreegood_order_no']
+X_numeric = X[numeric_var]  # Dữ liệu đầu vào X
+
+import pandas as pd
+from sklearn.preprocessing import OneHotEncoder
+from sklearn.ensemble import ExtraTreesClassifier
+
+# categorical variables
+categorical_var = ['region', 'channelname', 'segmentation', 'brand', 'pack_type', 'pack_size', 'month']
+
+# One-Hot Encoding categorical var
+encoder = OneHotEncoder(sparse=False, drop='first')
+X_encoded = encoder.fit_transform(X[categorical_var])
+
+X_encoded_df = pd.DataFrame(X_encoded, columns=encoder.get_feature_names_out(categorical_var))
+finalfeatureselection=pd.concat([X[numeric_var].reset_index(drop=True), X_encoded_df.reset_index(drop=True)], axis=1)
+finalfeatureselection
+
+#  Modeling ExtraTreesClassifier
+model = ExtraTreesClassifier(random_state=1505)
+
+# Training model
+model.fit(finalfeatureselection, Y)
+
+# print result top 15 feature
+print(model.feature_importances_)  
+feat_importances2 = pd.Series(model.feature_importances_, index=finalfeatureselection.columns)
+feat_importances2.nlargest(15).plot(kind='barh', color='skyblue')
+plt.title('Top 15 Important Features')
+plt.xlabel('Feature Importance Score')
+plt.ylabel('Features')
+plt.show()
+feat_importances2
+```
+<img width="431" alt="image" src="https://github.com/user-attachments/assets/37847bba-2de8-489c-89c6-830a46d9d803">
+
+## **Phase 3: Model tranining & testing**
+### **Handling imbalance data**
+```
+# Random Extract 10% dataset for Machine Learning Stage (Due to Data was too large)
+
+import pandas as pd
+
+X=filtered_outliers_df.sample(fraction= 0.1,seed=1505).select(
+    'totalec_so', 'distance_km', 'DeliveryDay', 'days_off_count', 
+    'Dayprocessing', '% urbanization rate','isfreegood_order_no','order_date',
+    'region','segmentation', 'channelname','brand','pack_type','pack_size', 
+)
+X=X.toPandas()
+
+# format datetime col order_date 
+X['order_date'] = pd.to_datetime(X['order_date'])
+
+# Create col month
+X['month'] = X['order_date'].dt.month
+
+#Create X and Y for ML Stage
+X=X.values
+import numpy as np
+X = np.delete(X, 7, axis=1)
+
+print(X.shape)
+
+Y=filtered_outliers_df.sample(fraction= 0.1,seed=1505).select('DIFOT')
+Y=Y.toPandas()
+
+# Rename 'channelname' to 'segmentation' 
+X.rename(columns={'channelname': 'temp_channelname', 'segmentation': 'channelname'}, inplace=True)
+X.rename(columns={'temp_channelname': 'segmentation'}, inplace=True)
+
+X['channelname'].fillna('DRINKING', inplace=True)
+X['segmentation'].fillna('Bronze', inplace=True)
+X['brand'].fillna('*******', inplace=True)
+X['pack_type'].fillna('PET', inplace=True)
+X['pack_size'].fillna('320ML',inplace=True)
+
+X_final=finalfeatureselection[['Dayprocessing','DeliveryDay','totalec_so','distance_km','days_off_count','% urbanization rate','isfreegood_order_no','month_3','pack_size_297ML','month_4','month_8','region_North West Region','pack_size_300ML','branding','segmentation_Gold']]
+# Using undersampling NearMiss to solve imbalance dataset
+
+X_final.shape,Y.shape
+from imblearn.under_sampling import NearMiss
+nm = NearMiss()
+
+X_res, y_res = nm.fit_resample(X_final,Y)
+
+X_res.shape, y_res.shape
+```
+<img width="456" alt="image" src="https://github.com/user-attachments/assets/b3126792-de69-4ead-bfe1-88c01c7980b8">
+
+### **Data splitting**
+```
+from sklearn.model_selection import train_test_split
+np.random.seed(1505)
+X_train,X_test,Y_train,Y_test =train_test_split(X_res,y_res,test_size=0.2 )
+```
+<img width="462" alt="image" src="https://github.com/user-attachments/assets/fc861aaa-a05e-4e4a-a085-b2bf4c030f48">
+
+### **Training model**
+```
+from xgboost import XGBClassifier
+from sklearn.model_selection import cross_val_score
+import numpy as np
+
+# Create XGB Model
+model = XGBClassifier(use_label_encoder=False,eval_metrics='logloss',random_state=1505)
+k = 5
+scores = cross_val_score(model, X_train, Y_train, cv=k, scoring='accuracy')
+
+for fold, score in enumerate(scores, start=1):
+    print(f'Accuracy for fold {fold}: {score:.4f}')
+
+mean_accuracy = np.mean(scores)
+std_accuracy = np.std(scores)
+print(f'\nMean Accuracy (K-Fold = {k}): {mean_accuracy:.4f} ± {std_accuracy:.4f}')
+
+#.... The same with another models
+```
+<img width="338" alt="image" src="https://github.com/user-attachments/assets/79dd7890-eefc-4d1e-8a23-ed72c1313226">
+
+## **Testing model**
+### **Evaluation model**
+
+```
+from xgboost import XGBClassifier
+from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score
+
+def print_single_score(y_true, y_pred):
+    precision = precision_score(y_true, y_pred, average='weighted')
+    recall = recall_score(y_true, y_pred, average='weighted')
+    f1 = f1_score(y_true, y_pred, average='weighted')
+    accuracy = accuracy_score(y_true, y_pred)
+    
+    print(f"Accuracy: {accuracy:.4f}")
+    print(f"Precision: {precision:.4f}")
+    print(f"Recall: {recall:.4f}")
+    print(f"F1-Score: {f1:.4f}")
+
+# Example usage with your DecisionTreeClassifier model
+dt_model=XGBClassifier(n_estimators=200,use_label_encoder=False,eval_metrics='logloss',random_state=1505)
+
+# Train the model
+dt_model.fit(X_train, Y_train)
+
+# Predict test data
+y_pred = dt_model.predict(X_test)
+
+# Print the single representative scores
+print_single_score(Y_test, y_pred)
+
+# ........ Do the same with another models
+```
+<img width="345" alt="image" src="https://github.com/user-attachments/assets/a91021ba-ed9f-4e57-a6a2-636bc187b346">
+
+#### *Model selection XGB*
+```
+# List top 5 feature in XGB model
+# Choosing metric weight
+importance = dt_model.get_booster().get_score(importance_type='weight')
+importance_df = pd.DataFrame(importance.items(), columns=['Feature', 'Importance'])
+importance_df = importance_df.sort_values(by='Importance', ascending=False)
+top_10_features = importance_df.head(5)
+print(top_10_features)
+
+# Visual top 5 feature
+top_10_features.plot(kind='barh', x='Feature', y='Importance', legend=False)
+plt.title('Top 5 Feature Importances')
+plt.show()
+```
+<img width="400" alt="image" src="https://github.com/user-attachments/assets/a7e45467-d92e-4cd2-be7d-45db43bc4e0e">
+
+```
+# Demo one tree in XGB classifier model 
+
+import matplotlib.pyplot as plt
+from xgboost import plot_tree
+
+plt.figure(figsize=(20, 10))
+plot_tree(dt_model, num_trees=9, rankdir='LR')
+plt.show()
+
+# List out features in tree
+booster = dt_model.get_booster()
+feature_names = booster.feature_names
+
+tree = booster.get_dump()[9]  
+
+# Print features
+print("Nội dung cây thứ 10:")
+print(tree)
+
+features_in_tree = set()
+
+for line in tree.split('\n'):
+    if 'feature' in line:
+        parts = line.split(' ')
+        for part in parts:
+            if 'feature' in part:
+                feature_index = int(part.split('[')[-1].replace(']', ''))
+                features_in_tree.add(feature_names[feature_index])
+
+print("Feature in tree number 10:")
+for feature in features_in_tree:
+    print(feature)
+```
+<img width="586" alt="image" src="https://github.com/user-attachments/assets/c3f2efdd-0575-49f6-8258-ee582ea27b06">
+
+#### *Checking underfitting and overfitting*
+```
+from xgboost import XGBClassifier
+from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score
+
+def evaluate_model(model, X_train, Y_train, X_test, Y_test):
+    model.fit(X_train, Y_train)
+    y_train_pred = model.predict(X_train)
+    y_test_pred = model.predict(X_test)
+    
+    # Evaluating in traningset
+    train_accuracy = accuracy_score(Y_train, y_train_pred)
+    train_precision = precision_score(Y_train, y_train_pred)
+    train_recall = recall_score(Y_train, y_train_pred)
+    train_f1 = f1_score(Y_train, y_train_pred)
+    
+    # Evaluating in testset
+    test_accuracy = accuracy_score(Y_test, y_test_pred)
+    test_precision = precision_score(Y_test, y_test_pred)
+    test_recall = recall_score(Y_test, y_test_pred)
+    test_f1 = f1_score(Y_test, y_test_pred)
+    
+    # Print result
+    print("Training Performance:")
+    print(f"Accuracy: {train_accuracy:.4f}, Precision: {train_precision:.4f}, Recall: {train_recall:.4f}, F1-Score: {train_f1:.4f}")
+    print("\nTest Performance:")
+    print(f"Accuracy: {test_accuracy:.4f}, Precision: {test_precision:.4f}, Recall: {test_recall:.4f}, F1-Score: {test_f1:.4f}")
+    
+    # Compare testset and trainingset
+    print("\nModel Evaluation:")
+    if train_accuracy > test_accuracy + 0.05:
+        print("The model is likely overfitting.")
+    elif train_accuracy < test_accuracy - 0.05:
+        print("The model is likely underfitting.")
+    else:
+        print("The model is performing well without signs of overfitting or underfitting.")
+        
+
+from sklearn.tree import DecisionTreeClassifier
+dt_model=XGBClassifier(use_label_encoder=False,eval_metrics='logloss',random_state=1505)
+
+evaluate_model(dt_model, X_train, Y_train, X_test, Y_test)
+```
+<img width="547" alt="image" src="https://github.com/user-attachments/assets/cad1b857-1a63-4a02-92ca-d292a332e3f0">
 
 # **Reference**
 [Alex The Analyst](https://www.youtube.com/watch?v=4UltKCnnnTA&list=PLUaB-1hjhk8FE_XZ87vPPSfHqb6OcM0cF&index=19)
